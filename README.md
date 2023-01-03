@@ -1,8 +1,9 @@
 # Seedhodler OS - BETA
 !!! This software is in beta and considered unstable! Use it at your own risk! We are not responsible for any damage/harm/loss resulting through using this software !!!
 
-It is the corresponding image for https://github.com/seedhodler/seedhodler-beta
-A corresponding image for the current up to date project https://github.com/seedhodler/seedhodler will be released in the future
+This is the corresponding image for https://github.com/seedhodler/seedhodler-beta
+A corresponding image for the current up-to-date project https://github.com/seedhodler/seedhodler will be released in the future.
+
 ## Build on Linux (and macOS?)
 
 Building on macOS might be possible by activating cross compiling support in nix after installing it. I didn't test this so far since i don't own a mac. In case you have the chance, please test it and edit the readme.

@@ -1,4 +1,4 @@
-{ config, pkgs, lib, modulesPath, ... }:
+{ config, pkgs, lib, modulesPath, inputs, ... }:
 with config;
 let
 
@@ -6,15 +6,6 @@ let
   bip39 = with pkgs; fetchurl {
     url = "https://github.com/iancoleman/bip39/releases/download/0.4.0/bip39-standalone.html";
     sha256 = "bd207d5bebb499dd57f79ae8c8c8b5da58d17cdd3168f6d4b8b8827a7ab00d86";
-  };
-
-  # seedhodler web app
-  seedhodler-gh-pages = pkgs.fetchgit {
-    name = "seedhodler-gh-pages";
-    url = https://github.com/seedhodler/seedhodler/;
-    branchName = "gh-pages";
-    rev = "6cfd2f6eabc7779051b9b8df4c9cfc5e9433b6ae";
-    sha256 = "1pchmawgmvdckx7zcgv6n3p6r95kbx8lsckizvk1ilasq79465az";
   };
 
   # chromium for hodlers
@@ -41,9 +32,9 @@ in
   };
 
   # Bootloader Theme
-  isoImage.splashImage = ./gfx/bloom-blossom-cleaning-dandelion-434163.png;
-  isoImage.efiSplashImage = ./gfx/bloom-blossom-cleaning-dandelion-434163.png;
-  isoImage.grubTheme = ./grub2-installer;
+  isoImage.splashImage = ../../../gfx/bloom-blossom-cleaning-dandelion-434163.png;
+  isoImage.efiSplashImage = ../../../gfx/bloom-blossom-cleaning-dandelion-434163.png;
+  isoImage.grubTheme = ../../../grub2-installer;
 
   # Applicaitons
   environment.systemPackages = with pkgs; [
@@ -76,7 +67,7 @@ in
   # Serve Seedhodler Web App
   services.nginx.enable = true;
   services.nginx.virtualHosts."localhost" = {
-      root = seedhodler-gh-pages;
+      root = inputs.seedhodler.packages.${pkgs.system}.seedhodler;
   };
 
   # Hodler user

@@ -5,7 +5,7 @@
 
 
 set -e
-ISO=`nixos-generate --format-path iso.nix -c configuration.nix --cores 16 -I nixpkgs=/home/grmpf/synced/projects/github/nixpkgs | tail -n 1`
+ISO=$(realpath ./result/iso/nixos.iso)
 
 VBoxManage controlvm "test-isos" poweroff || true
 echo "detaching old iso"

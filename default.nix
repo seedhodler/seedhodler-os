@@ -1,15 +1,16 @@
+# This file provides backward compatibility to nix < 2.4 clients
 let
-  nixpkgs = import ./nixpkgs-src.nix;
-  configuration = ./configuration.nix;
-  format-config = ./iso.nix;
-  system = "x86_64-linux";
-  final = import "${toString nixpkgs}/nixos/lib/eval-config.nix" {
-    inherit system;
-    modules = [
-      #compression-config
-      format-config
-      configuration
-    ];
-  };
+  flake =
+    import
+    (
+      let
+        lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+      in
+        fetchTarball {
+          url = "https://github.com/edolstra/flake-compat/archive/${lock.nodes.flake-compat.locked.rev}.tar.gz";
+          sha256 = lock.nodes.flake-compat.locked.narHash;
+        }
+    )
+    {src = ./.;};
 in
-final.config.system.build.isoImage
+  flake.defaultNix

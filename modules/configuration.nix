@@ -16,6 +16,17 @@ let
     mkdir -p $out
     cp ${seedhodlerHtml} $out/index.html
   '';
+
+  # The kiosk waits for the local server to accept connections before launching
+  # the browser. Without this, a cold boot races: Chromium can start before
+  # darkhttpd is listening and land on its connection-error page instead of the
+  # app (only a manual reload recovers it).
+  kiosk = pkgs.writeShellScript "seedhodler-kiosk" ''
+    until (exec 3<>/dev/tcp/127.0.0.1/8080) 2>/dev/null; do sleep 0.2; done
+    exec ${pkgs.chromium}/bin/chromium \
+      --ozone-platform=wayland --incognito --no-first-run --disable-sync \
+      http://127.0.0.1:8080/
+  '';
 in
 {
   system.stateVersion = "24.11";
@@ -82,8 +93,15 @@ in
     enable = true;
     user = "hodler";
     # cage forces fullscreen, so we do not use chromium --kiosk (which would
-    # suppress the print dialog the blank-forms flow needs).
-    program = "${pkgs.chromium}/bin/chromium --ozone-platform=wayland --incognito --no-first-run --disable-sync http://127.0.0.1:8080/";
+    # suppress the print dialog the blank-forms flow needs). The wrapper waits
+    # for the server (see `kiosk` above).
+    program = kiosk;
+  };
+  # Order the kiosk after the app server so darkhttpd is up first; the wrapper's
+  # port-wait then closes the remaining race.
+  systemd.services.cage-tty1 = {
+    after = [ "seedhodler-www.service" ];
+    wants = [ "seedhodler-www.service" ];
   };
 
   # -------------------------------------------------------------------------

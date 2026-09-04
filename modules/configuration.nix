@@ -46,6 +46,16 @@ in
   # Identity and boot medium
   # -------------------------------------------------------------------------
   networking.hostName = "seedhodler";
+
+  # Boot-menu branding: this is an appliance, not the NixOS installer. The menu
+  # label is built as "<distroName> <label><appendToMenuLabel>", so this reads
+  # "Seedhodler OS v1.0.0" instead of "NixOS 24.11.<hash> Installer".
+  system.nixos.distroName = "Seedhodler OS";
+  system.nixos.label = lib.mkForce appVersion;
+  isoImage.appendToMenuLabel = lib.mkForce "";
+  # A short, visible menu so a user on old hardware can still pick a fallback.
+  boot.loader.timeout = lib.mkForce 8;
+
   isoImage.isoName = lib.mkForce "seedhodler-os-${appVersion}.iso";
   isoImage.volumeID = lib.mkForce "SEEDHODLER_OS";
   isoImage.makeEfiBootable = true;

@@ -24,7 +24,15 @@ let
   kiosk = pkgs.writeShellScript "seedhodler-kiosk" ''
     until (exec 3<>/dev/tcp/127.0.0.1/8080) 2>/dev/null; do sleep 0.2; done
     exec ${pkgs.chromium}/bin/chromium \
-      --ozone-platform=wayland --incognito --no-first-run --disable-sync \
+      `# software rendering: no hardware GL to depend on across unknown boot`  \
+      `# hardware or in a VM (a plain form needs none)`                        \
+      --ozone-platform=wayland --disable-gpu                                   \
+      `# disable Chrome's on-device ML / Optimization Guide: it probes for a`  \
+      `# GPU that is not there and takes the page renderer down with it`       \
+      `# ("Aw, Snap!"), and it wants the network this box does not have`       \
+      --disable-features=OptimizationGuideOnDeviceModel,OptimizationHints,OptimizationGuideModelDownloading,Translate,MediaRouter \
+      --disable-background-networking --disable-component-update              \
+      --incognito --no-first-run --no-default-browser-check --disable-sync    \
       http://127.0.0.1:8080/
   '';
 in
@@ -114,6 +122,19 @@ in
     browsing = false;
     webInterface = false;
   };
+
+  # -------------------------------------------------------------------------
+  # Fonts. The installation-cd minimal profile disables fontconfig to slim the
+  # image, which leaves no /etc/fonts at all: Chromium then finds no font, and
+  # loading the app's embedded @font-face fonts trips a renderer NOTREACHED that
+  # crashes the page ("Aw, Snap!"). Force fontconfig back on and ship real
+  # fonts (DejaVu + Liberation cover sans/serif/mono).
+  # -------------------------------------------------------------------------
+  fonts.fontconfig.enable = lib.mkForce true;
+  fonts.packages = with pkgs; [
+    dejavu_fonts
+    liberation_ttf
+  ];
 
   # -------------------------------------------------------------------------
   # Trim the closure.

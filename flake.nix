@@ -44,12 +44,14 @@
       };
 
       # `nix run .#vm` boots the built ISO in a throwaway qemu VM for testing.
+      # It needs a few GB of RAM: copytoram loads the whole image into RAM, and
+      # Chromium wants headroom on top. virtio-gpu gives cage a KMS device.
       apps.${system}.vm = {
         type = "app";
         program = toString (
           pkgs.writeShellScript "seedhodler-os-vm" ''
             exec ${pkgs.qemu}/bin/qemu-system-x86_64 \
-              -enable-kvm -m 4096 -smp 2 -vga virtio \
+              -enable-kvm -m 6144 -smp 4 -vga virtio \
               -cdrom ${self.packages.${system}.iso}/iso/*.iso
           ''
         );

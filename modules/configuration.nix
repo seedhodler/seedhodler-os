@@ -67,7 +67,7 @@ let
     input "type:touchpad" {
       tap enabled
       click_method clickfinger
-      natural_scroll disabled
+      natural_scroll enabled
       dwt enabled
     }
 

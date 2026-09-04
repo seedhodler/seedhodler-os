@@ -24,6 +24,9 @@ let
   kiosk = pkgs.writeShellScript "seedhodler-kiosk" ''
     until (exec 3<>/dev/tcp/127.0.0.1/8080) 2>/dev/null; do sleep 0.2; done
     exec ${pkgs.chromium}/bin/chromium \
+      `# fullscreen without browser chrome. --start-fullscreen (not --kiosk):`  \
+      `# --kiosk would suppress the print dialog the blank-forms flow needs.`   \
+      --start-fullscreen                                                       \
       `# software rendering: no hardware GL to depend on across unknown boot`  \
       `# hardware or in a VM (a plain form needs none)`                        \
       --ozone-platform=wayland --disable-gpu                                   \
@@ -100,9 +103,8 @@ in
   services.cage = {
     enable = true;
     user = "hodler";
-    # cage forces fullscreen, so we do not use chromium --kiosk (which would
-    # suppress the print dialog the blank-forms flow needs). The wrapper waits
-    # for the server (see `kiosk` above).
+    # The kiosk wrapper (see `kiosk` above) waits for the server, then launches
+    # Chromium fullscreen without its chrome. cage keeps it the only window.
     program = kiosk;
   };
   # Order the kiosk after the app server so darkhttpd is up first; the wrapper's

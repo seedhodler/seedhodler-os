@@ -229,16 +229,11 @@ in
   # Cursor theme, found by sway via the system icon path.
   environment.systemPackages = [ pkgs.adwaita-icon-theme ];
 
-  # -------------------------------------------------------------------------
-  # Printing: a locally attached (USB) printer, offline. The blank-forms flow
-  # needs this. No network printing, no sharing.
-  # -------------------------------------------------------------------------
-  services.printing = {
-    enable = true;
-    drivers = [ pkgs.gutenprint ]; # generic drivers covering most inkjet/laser printers
-    browsing = false;
-    webInterface = false;
-  };
+  # No printing. Offline printing to arbitrary USB printers is a driver lottery
+  # (host-based "winprinters" need proprietary firmware uploads, there is no
+  # printer-setup UI on a kiosk, and so on), and the blank forms carry no secret:
+  # they are printed on a normal printer instead, and the embedded app is the
+  # offline build with every print option hidden. So no CUPS here.
 
   # -------------------------------------------------------------------------
   # Fonts. The installation-cd minimal profile disables fontconfig to slim the

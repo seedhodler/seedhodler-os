@@ -16,10 +16,12 @@
       # point of the OS/app split: the HTML baked into the image is byte-for-byte
       # the audited, minisign-signed file published at the release below, so the
       # image can be verified against the app release (same SHA-256).
-      appVersion = "v1.0.1";
+      # The offline build variant, which hides every print option (this OS has no
+      # printing; blank forms are printed on a normal printer instead).
+      appVersion = "v1.0.2";
       seedhodlerHtml = pkgs.fetchurl {
-        url = "https://github.com/seedhodler/seedhodler/releases/download/${appVersion}/seedhodler-${appVersion}.html";
-        hash = "sha256-2Fu4eS0KudzaSBzf+918gYUTbu3C6oJTXSDXNmwqPpw=";
+        url = "https://github.com/seedhodler/seedhodler/releases/download/${appVersion}/seedhodler-${appVersion}-offline.html";
+        hash = "sha256-eIzLAP3VrYYbPDWiK+PhHpxCujyZF8raIiC/cdiFngA=";
       };
 
       nixosSystem = nixpkgs.lib.nixosSystem {

@@ -28,6 +28,9 @@ in
   isoImage.volumeID = lib.mkForce "SEEDHODLER_OS";
   isoImage.makeEfiBootable = true;
   isoImage.makeUsbBootable = true;
+  # Light, low-memory squashfs compression so the image assembles comfortably on
+  # a small builder; the image is a bit larger but builds fast and does not OOM.
+  isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 3";
   # Run entirely from RAM so the USB stick can be pulled after boot.
   boot.kernelParams = [ "copytoram" ];
 
@@ -50,8 +53,9 @@ in
   # -------------------------------------------------------------------------
   # Hardening: unprivileged, no escalation, no remote access.
   # -------------------------------------------------------------------------
-  security.sudo.enable = false;
-  services.openssh.enable = false;
+  security.sudo.enable = lib.mkForce false;
+  # The installation-device profile enables sshd for remote installs; not here.
+  services.openssh.enable = lib.mkForce false;
   users.mutableUsers = false;
   users.users.hodler = {
     isNormalUser = true;

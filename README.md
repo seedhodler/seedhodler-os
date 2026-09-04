@@ -1,58 +1,78 @@
-# Seedhodler OS - BETA
-!!! This software is in beta and considered unstable! Use it at your own risk! We are not responsible for any damage/harm/loss resulting through using this software !!!
+# Seedhodler OS
 
-This is the corresponding image for https://github.com/seedhodler/seedhodler-beta
-A corresponding image for the current up-to-date project https://github.com/seedhodler/seedhodler will be released in the future.
+An offline, amnesiac live system whose only job is to run [Seedhodler](https://github.com/seedhodler/seedhodler)
+securely: boot it on a spare machine with no network, generate or restore your
+seed shares, print the blank forms, and shut down. Nothing is written to disk and
+nothing can leave the machine.
 
-## Build on Linux (and macOS?)
+> Status: rebuild in progress. This is a clean, modern NixOS rebuild of the old
+> 2023 image. It has not been built end to end yet; expect a few iterations to
+> get a first bootable image.
 
-Building on macOS might be possible by activating cross compiling support in nix after installing it. I didn't test this so far since i don't own a mac. In case you have the chance, please test it and edit the readme.
+## What it is
 
-### 1. Install the nix package manager on your system
-Execute as normal user:
+- **NixOS live ISO**, declaratively defined and pinned (`flake.lock`), so the
+  image can be reproduced and audited from source.
+- **The exact signed app, embedded by hash.** The Seedhodler HTML baked into the
+  image is byte-for-byte the minisign-signed release
+  (`seedhodler-vX.Y.Z.html`); the version and hash live in `flake.nix`. You can
+  verify the embedded file against the app release:
+  `nix build .#seedhodler-html && sha256sum result`.
+- **Amnesiac.** Runs from RAM (squashfs store, tmpfs root, `copytoram`); a reboot
+  erases everything.
+- **Air-gapped.** No networking is brought up at all (no NetworkManager, no
+  Wi-Fi, no DHCP); only loopback exists, for the local app server.
+- **Does not touch your disks.** No auto-mounting of internal drives.
+- **Minimal.** No desktop: a single fullscreen browser (Chromium under the `cage`
+  Wayland kiosk) pointed at the app on `http://127.0.0.1`. Unprivileged user, no
+  sudo, no SSH.
+- **Prints offline.** CUPS with generic drivers, for a USB printer.
+
+## Build
+
+Needs [Nix](https://nixos.org/download) with flakes enabled.
+
 ```bash
-curl https://nixos.org/nix/install | sh
+nix build .#iso
+# the image lands at ./result/iso/seedhodler-os-<version>.iso
 ```
-More information: https://nixos.org/nix/download.html
 
-### 2. Build SeedhodlerOS iso image with nix:
+## Test in a VM
+
 ```bash
-nix-build
+nix run .#vm
 ```
-Find the image at `./result/iso/nix.iso`
 
-## Build using Docker (MacOS / Windows + Docker Machine)
-(Untested on Windows. If you get the chance to test, please extend readme)
-### 1. Install Docker on your system
-Follow the instructions on https://docs.docker.com/get-docker/ on how to install Docker on your system.
+## Write to a USB stick
 
-### 2. Build Seedhodler OS iso image:
 ```bash
-docker run --rm -it \
-    -v "$(pwd)/docker-result:/result" \
-    -v "$(pwd):/project" \
-    nixos/nix sh -c "
-        nix-env -i git && 
-        nix-build /project --out-link /iso-out &&
-        cp /iso-out/iso/nixos.iso /result/nixos.iso"
+sudo dd if=./result/iso/seedhodler-os-*.iso of=/dev/sdX bs=4M status=progress conv=fsync
+# replace /dev/sdX with your USB device. This erases the stick.
 ```
-Find the image at `./result/iso/nixos.iso` (outside the container)
 
+Then boot the target machine from the USB stick (disable Secure Boot if needed),
+with no network connected.
 
+## Verify the embedded app matches the release
 
-## Test Seedhodler OS
-### There are several possibilities how to test the iso image:
-1. Boot the iso using a virtual machine on your computer.
-2. Use dd or etcher to flash the image onto a usb drive, then boot your computer from the usb drive (Even though Seedhodler OS is designed to not touch any existing data on your computer, it's ALPHA, therefore do this at your own Risk! )
-
-## Project Structure
+```bash
+nix build .#seedhodler-html
+sha256sum result
+# must equal the SHA-256 published in the app release's SHA256SUMS.txt
 ```
-seedhosler-os/
-├--configuration.nix    OS configuration and applications
-├--default.nix          Used by nix-build command to initialize build
-├--iso.nix              Defines the output format (ISO image + bootloader config)
-├--nixpkgs-src.nix      pinning of nixpkgs verison to allow reproducible building
-├--test_in_vm.sh        script to build iso image and test in virtualbox. (requires setup)
-├--grub2-installer/     Bootloader Theme
-├--gfx/                 Contains Graphics and logos used inside the OS
+
+## Updating to a new app release
+
+Bump `appVersion` and the `hash` in `flake.nix` to the new signed release, then
+rebuild. The hash is the SRI form of the release's SHA-256
+(`nix hash to-sri --type sha256 <hex>`).
+
+## Layout
+
+```
+seedhodler-os/
+├── flake.nix                 inputs, the app-by-hash, and the ISO/vm outputs
+├── modules/configuration.nix the system: kiosk, printing, air-gap, hardening
+├── gfx/                      logos and boot artwork
+└── grub2-installer/          GRUB boot theme (not wired in yet)
 ```

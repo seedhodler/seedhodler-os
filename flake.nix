@@ -16,10 +16,10 @@
       # point of the OS/app split: the HTML baked into the image is byte-for-byte
       # the audited, minisign-signed file published at the release below, so the
       # image can be verified against the app release (same SHA-256).
-      appVersion = "v1.0.0";
+      appVersion = "v1.0.1";
       seedhodlerHtml = pkgs.fetchurl {
         url = "https://github.com/seedhodler/seedhodler/releases/download/${appVersion}/seedhodler-${appVersion}.html";
-        hash = "sha256-8wjBpKloHTS5Hk3ix8EcdRI7Q3XBotkplyEh2SDvMpQ=";
+        hash = "sha256-2Fu4eS0KudzaSBzf+918gYUTbu3C6oJTXSDXNmwqPpw=";
       };
 
       nixosSystem = nixpkgs.lib.nixosSystem {

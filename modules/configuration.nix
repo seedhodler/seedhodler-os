@@ -26,6 +26,59 @@ let
     magick -size 800x600 xc:'#f6f7f9' logo.png -gravity center -geometry +0+20 -composite png32:$out
   '';
 
+  # GRUB theme for the EFI menu. Without a theme GRUB draws a menu border out of
+  # box-drawing glyphs its built-in font lacks, which shows as garbled tofu. A
+  # theme renders the menu without that border (and carries its own font). Light
+  # ground with the wordmark, to match the BIOS splash.
+  grubThemeTxt = pkgs.writeText "theme.txt" ''
+    title-text: ""
+    desktop-image: "background.png"
+    terminal-font: "DejaVu Regular"
+
+    + image {
+      file = "logo.png"
+      top = 58%
+      left = 50%-200
+      width = 400
+      height = 76
+    }
+
+    + boot_menu {
+      left = 4%
+      top = 7%
+      width = 92%
+      height = 42%
+      item_font = "DejaVu Regular"
+      item_color = "#3a3a3a"
+      selected_item_color = "#4526a6"
+      item_height = 28
+      item_spacing = 3
+    }
+
+    + label {
+      id = "__timeout__"
+      top = 88%
+      left = 0
+      width = 100%
+      align = "center"
+      font = "DejaVu Regular"
+      color = "#8a8a8a"
+      text = "Booting in %d s"
+    }
+  '';
+  grubTheme = pkgs.runCommand "seedhodler-grub-theme" {
+    nativeBuildInputs = [ pkgs.librsvg pkgs.imagemagick ];
+  } ''
+    mkdir -p $out
+    cp ${pkgs.nixos-grub2-theme}/dejavu.pf2 $out/dejavu.pf2
+    # GRUB's PNG loader only accepts 8/16-bit truecolor, not palette/low-depth,
+    # so force 8-bit RGB(A) on both images.
+    magick -size 32x32 xc:'#f6f7f9' -depth 8 PNG24:$out/background.png
+    rsvg-convert -w 400 ${../gfx/logo.svg} -o logo-raw.png
+    magick logo-raw.png -depth 8 PNG32:$out/logo.png
+    cp ${grubThemeTxt} $out/theme.txt
+  '';
+
   # The kiosk waits for the local server to accept connections before launching
   # the browser. Without this, a cold boot races: Chromium can start before
   # darkhttpd is listening and land on its connection-error page instead of the
@@ -101,9 +154,8 @@ in
   boot.loader.timeout = lib.mkForce 8;
   # Quiet boot splash with the project emblem, for both BIOS (isolinux) and EFI
   # (grub). grubTheme is forced off so the emblem shows as the grub background.
-  isoImage.splashImage = splash;
-  isoImage.efiSplashImage = splash;
-  isoImage.grubTheme = lib.mkForce null;
+  isoImage.splashImage = splash; # BIOS (isolinux) background
+  isoImage.grubTheme = grubTheme; # EFI (grub) menu theme
 
   isoImage.isoName = lib.mkForce "seedhodler-os-${appVersion}.iso";
   isoImage.volumeID = lib.mkForce "SEEDHODLER_OS";

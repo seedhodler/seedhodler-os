@@ -47,6 +47,41 @@ let
       --incognito --no-first-run --no-default-browser-check --disable-sync    \
       http://127.0.0.1:8080/
   '';
+
+  # sway runs the kiosk instead of cage: unlike cage it can configure the
+  # touchpad. tap-to-click is off by default in libinput and a bare compositor
+  # never turns it on, so a laptop clickpad produced only motion and hold
+  # gestures, never a click. This config enables it.
+  swayConfig = pkgs.writeText "sway-kiosk.conf" ''
+    # No desktop chrome: no borders, no gaps, no status bar.
+    default_border none
+    default_floating_border none
+    gaps inner 0
+    gaps outer 0
+    bar {
+      mode invisible
+    }
+
+    # The touchpad fix: tap-to-click, and clickfinger so a one-finger physical
+    # press also left-clicks.
+    input "type:touchpad" {
+      tap enabled
+      click_method clickfinger
+      natural_scroll disabled
+      dwt enabled
+    }
+
+    # A clean cursor theme for the whole seat.
+    seat seat0 {
+      xcursor_theme Adwaita 24
+    }
+
+    # Launch the app; the wrapper waits for the server and starts Chromium
+    # fullscreen. Force any window borderless and fullscreen as a safety net.
+    exec ${kiosk}
+    for_window [app_id=".*"] fullscreen enable, border none
+    for_window [class=".*"] fullscreen enable, border none
+  '';
 in
 {
   system.stateVersion = "24.11";
@@ -128,26 +163,18 @@ in
     };
   };
 
-  services.cage = {
+  # Autologin straight into the sway kiosk session as the unprivileged user.
+  # sway execs the kiosk wrapper (which waits for the server, then launches
+  # Chromium fullscreen). Using sway rather than cage so the touchpad can be
+  # configured (see swayConfig above).
+  services.greetd = {
     enable = true;
-    user = "hodler";
-    # The kiosk wrapper (see `kiosk` above) waits for the server, then launches
-    # Chromium fullscreen without its chrome. cage keeps it the only window.
-    program = kiosk;
-  };
-  # Order the kiosk after the app server so darkhttpd is up first; the wrapper's
-  # port-wait then closes the remaining race. The XCURSOR_* vars give cage
-  # (wlroots draws the pointer) a clean modern cursor instead of the dated X11
-  # core cursor the base image would otherwise use.
-  systemd.services.cage-tty1 = {
-    after = [ "seedhodler-www.service" ];
-    wants = [ "seedhodler-www.service" ];
-    environment = {
-      XCURSOR_THEME = "Adwaita";
-      XCURSOR_SIZE = "24";
+    settings.default_session = {
+      command = "${pkgs.sway}/bin/sway --config ${swayConfig}";
+      user = "hodler";
     };
   };
-  # Cursor theme, found by cage via the system icon path.
+  # Cursor theme, found by sway via the system icon path.
   environment.systemPackages = [ pkgs.adwaita-icon-theme ];
 
   # -------------------------------------------------------------------------

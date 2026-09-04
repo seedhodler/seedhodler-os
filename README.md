@@ -27,9 +27,11 @@ try on a spare box.
   is byte-for-byte the minisign-signed release (`seedhodler-vX.Y.Z.html`); the
   version and its SHA-256 live in `flake.nix`. You can rebuild just the embedded
   file and check its hash against the app release (see below).
-- **Amnesiac.** Runs entirely from RAM (squashfs store, tmpfs root,
-  `copytoram`). Once booted, the USB stick can be pulled, and a reboot erases
-  everything.
+- **Amnesiac.** The root is a tmpfs and the store is read-only on the medium;
+  nothing is written to the machine's disk, and a reboot erases everything. The
+  default boot leaves the USB stick in, so it runs on low-RAM and older machines.
+  The `(copytoram)` boot-menu entry instead loads the whole image into RAM so the
+  stick can be pulled, at the cost of needing a couple of GB of RAM.
 - **Air-gapped by construction.** No network is brought up at all: no
   NetworkManager, no Wi-Fi, no DHCP. Only loopback exists, for the local app
   server. This is stronger than a firewall, because there is no interface to

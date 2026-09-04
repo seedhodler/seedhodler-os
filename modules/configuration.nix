@@ -17,6 +17,15 @@ let
     cp ${seedhodlerHtml} $out/index.html
   '';
 
+  # A quiet boot splash: the Seedhodler emblem on a clean light ground, in place
+  # of the NixOS artwork. The bootloader draws the menu text over this.
+  splash = pkgs.runCommand "seedhodler-splash.png" {
+    nativeBuildInputs = [ pkgs.librsvg pkgs.imagemagick ];
+  } ''
+    rsvg-convert -w 480 ${../gfx/logo.svg} -o logo.png
+    magick -size 800x600 xc:'#f6f7f9' logo.png -gravity center -geometry +0+20 -composite png32:$out
+  '';
+
   # The kiosk waits for the local server to accept connections before launching
   # the browser. Without this, a cold boot races: Chromium can start before
   # darkhttpd is listening and land on its connection-error page instead of the
@@ -55,6 +64,11 @@ in
   isoImage.appendToMenuLabel = lib.mkForce "";
   # A short, visible menu so a user on old hardware can still pick a fallback.
   boot.loader.timeout = lib.mkForce 8;
+  # Quiet boot splash with the project emblem, for both BIOS (isolinux) and EFI
+  # (grub). grubTheme is forced off so the emblem shows as the grub background.
+  isoImage.splashImage = splash;
+  isoImage.efiSplashImage = splash;
+  isoImage.grubTheme = lib.mkForce null;
 
   isoImage.isoName = lib.mkForce "seedhodler-os-${appVersion}.iso";
   isoImage.volumeID = lib.mkForce "SEEDHODLER_OS";
@@ -63,8 +77,12 @@ in
   # Light, low-memory squashfs compression so the image assembles comfortably on
   # a small builder; the image is a bit larger but builds fast and does not OOM.
   isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 3";
-  # Run entirely from RAM so the USB stick can be pulled after boot.
-  boot.kernelParams = [ "copytoram" ];
+  # No copytoram in the default boot: copying the whole image into RAM (2 GB+) is
+  # exactly what fails on low-RAM/old machines. The default boots on weak hardware
+  # with the stick left in; the "(copytoram)" boot-menu entry still runs fully
+  # from RAM for anyone who wants to pull the stick. Amnesiac either way: root is
+  # tmpfs, the store is read-only on the medium, nothing is written to the disk.
+  boot.loader.grub.memtest86.enable = lib.mkForce false;
 
   # -------------------------------------------------------------------------
   # Air-gap: bring up no network at all; only loopback exists.

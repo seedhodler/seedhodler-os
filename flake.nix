@@ -18,10 +18,10 @@
       # image can be verified against the app release (same SHA-256).
       # The offline build variant, which hides every print option (this OS has no
       # printing; blank forms are printed on a normal printer instead).
-      appVersion = "v1.0.2";
+      appVersion = "v1.0.3";
       seedhodlerHtml = pkgs.fetchurl {
         url = "https://github.com/seedhodler/seedhodler/releases/download/${appVersion}/seedhodler-${appVersion}-offline.html";
-        hash = "sha256-eIzLAP3VrYYbPDWiK+PhHpxCujyZF8raIiC/cdiFngA=";
+        hash = "sha256-a6BVsBqa6ssjdxHjEBBh57lJ71hlDSbk6kJCfRg0Ds4=";
       };
 
       nixosSystem = nixpkgs.lib.nixosSystem {

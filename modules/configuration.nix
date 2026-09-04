@@ -106,11 +106,19 @@ in
     program = kiosk;
   };
   # Order the kiosk after the app server so darkhttpd is up first; the wrapper's
-  # port-wait then closes the remaining race.
+  # port-wait then closes the remaining race. The XCURSOR_* vars give cage
+  # (wlroots draws the pointer) a clean modern cursor instead of the dated X11
+  # core cursor the base image would otherwise use.
   systemd.services.cage-tty1 = {
     after = [ "seedhodler-www.service" ];
     wants = [ "seedhodler-www.service" ];
+    environment = {
+      XCURSOR_THEME = "Adwaita";
+      XCURSOR_SIZE = "24";
+    };
   };
+  # Cursor theme, found by cage via the system icon path.
+  environment.systemPackages = [ pkgs.adwaita-icon-theme ];
 
   # -------------------------------------------------------------------------
   # Printing: a locally attached (USB) printer, offline. The blank-forms flow

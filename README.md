@@ -113,9 +113,8 @@ nix hash to-sri --type sha256 <hex-from-SHA256SUMS>
 seedhodler-os/
 ├── flake.nix                 inputs, the app-by-hash, and the iso/vm outputs
 ├── flake.lock                pinned nixpkgs, for a reproducible build
-├── modules/configuration.nix the system: kiosk, printing, air-gap, hardening
-├── gfx/                      logos and boot artwork
-└── grub2-installer/          GRUB boot theme (not wired in yet)
+├── modules/configuration.nix the system: kiosk, air-gap, hardening
+└── gfx/logo.svg              logo used for the boot splash and GRUB theme
 ```
 
 ## License

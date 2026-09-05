@@ -2,8 +2,8 @@
 
 A small, offline, amnesiac live system with one job: run
 [Seedhodler](https://github.com/seedhodler/seedhodler) safely on a spare machine
-with no network. Boot it, generate or restore your seed shares, print the blank
-forms, shut down. Nothing is written to disk, and nothing can leave the machine.
+with no network. Boot it, generate or restore your seed shares, write them down,
+shut down. Nothing is written to disk, and nothing can leave the machine.
 
 It is a clean NixOS build: declarative, pinned, and reproducible. The Seedhodler
 app baked into the image is the exact, minisign-signed release, embedded by hash,
@@ -11,22 +11,22 @@ so the image can be audited against the published app.
 
 ## Status
 
-Builds and boots straight to the app. A `nix build .#iso` produces a bootable
-ISO, and it has been verified end to end in a VM: the machine comes up, serves
-the embedded app on loopback, and opens it fullscreen in the kiosk browser.
-
-Not yet exercised on real hardware: booting on physical machines (UEFI/BIOS,
-varied GPUs) and printing to a real USB printer. Those are the next things to
-try on a spare box.
+Released and working. `nix build .#iso` produces a bootable ISO, and signed
+images are published on the
+[releases page](https://github.com/seedhodler/seedhodler-os/releases). It has
+been verified end to end: booting on real hardware (a Lenovo laptop over UEFI)
+and in VMs (UEFI and BIOS), coming up air-gapped, serving the embedded app on
+loopback, and opening it fullscreen in the kiosk browser.
 
 ## What it is
 
 - **A NixOS live ISO**, defined declaratively and pinned with `flake.lock`, so
   the whole image can be reproduced and audited from source.
 - **The exact signed app, embedded by hash.** The Seedhodler HTML in the image
-  is byte-for-byte the minisign-signed release (`seedhodler-vX.Y.Z.html`); the
-  version and its SHA-256 live in `flake.nix`. You can rebuild just the embedded
-  file and check its hash against the app release (see below).
+  is byte-for-byte the minisign-signed **offline** release
+  (`seedhodler-vX.Y.Z-offline.html`); the version and its SHA-256 live in
+  `flake.nix`. You can rebuild just the embedded file and check its hash against
+  the app release (see below).
 - **Amnesiac.** The root is a tmpfs and the store is read-only on the medium;
   nothing is written to the machine's disk, and a reboot erases everything. The
   default boot leaves the USB stick in, so it runs on low-RAM and older machines.
@@ -39,12 +39,14 @@ try on a spare box.
 - **Leaves your disks alone.** No auto-mounting of internal drives; the live
   system never touches them.
 - **Minimal, single-purpose UI.** No desktop. One fullscreen Chromium under the
-  `cage` Wayland kiosk, pointed at the app on `http://127.0.0.1`. Software
+  `sway` Wayland kiosk, pointed at the app on `http://127.0.0.1`. Software
   rendering, so it does not depend on a GPU driver that varies by machine.
   Chrome's telemetry, component updates, and on-device ML are turned off (they
   assume a network and a GPU this box does not have).
-- **Prints offline.** CUPS with generic drivers, for a locally attached USB
-  printer. No network printing, no sharing.
+- **No printing, by design.** Offline printing to arbitrary USB printers is a
+  driver lottery, and the blank forms carry no secret, so print them on a normal
+  printer instead. The embedded app is the offline build: its print buttons open
+  a short note pointing to seedhodler.io rather than a print dialog.
 - **Locked down.** An unprivileged user with no password, no `sudo`, no SSH.
 
 ## How a session goes
@@ -52,9 +54,28 @@ try on a spare box.
 1. Flash the ISO to a USB stick and boot a spare machine from it, with no
    network connected.
 2. The system comes up amnesiac and air-gapped, and opens Seedhodler fullscreen.
-3. Generate a new seed or restore one from shares; print the blank forms and
-   write your shares down.
-4. Shut down (or just pull the power). Nothing was written anywhere.
+3. Generate a new seed or restore one from shares, and write your shares down by
+   hand. (Print blank forms beforehand on a normal printer if you want them.)
+4. Shut down, or just pull the power. Nothing was written anywhere.
+
+## Download a signed ISO
+
+Prebuilt images are on the
+[releases page](https://github.com/seedhodler/seedhodler-os/releases), each
+checksummed and signed. Before you trust one:
+
+```bash
+# checksum
+sha256sum -c SHA256SUMS.txt
+
+# minisign signature (public key: minisign.pub in this repo)
+minisign -Vm seedhodler-os-vX.Y.Z.iso -p minisign.pub
+
+# GitHub build provenance
+gh attestation verify seedhodler-os-vX.Y.Z.iso --repo seedhodler/seedhodler-os
+```
+
+Or reproduce the image yourself from source (see Build) and compare.
 
 ## Build
 
@@ -91,7 +112,8 @@ The image is meant to carry the audited, signed app unchanged. To check that:
 ```bash
 nix build .#seedhodler-html
 sha256sum result
-# must equal the SHA-256 published in the app release's SHA256SUMS.txt
+# must equal the SHA-256 of the -offline.html asset in the app release's
+# SHA256SUMS.txt
 ```
 
 The app release itself is signed with minisign and carries a build provenance
@@ -114,7 +136,9 @@ seedhodler-os/
 ├── flake.nix                 inputs, the app-by-hash, and the iso/vm outputs
 ├── flake.lock                pinned nixpkgs, for a reproducible build
 ├── modules/configuration.nix the system: kiosk, air-gap, hardening
-└── gfx/logo.svg              logo used for the boot splash and GRUB theme
+├── gfx/logo.svg              logo used for the boot splash and GRUB theme
+├── minisign.pub              public key for verifying released ISOs
+└── .github/workflows/        signed ISO release CI (tag a version to publish)
 ```
 
 ## License

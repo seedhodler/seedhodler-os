@@ -1,0 +1,141 @@
+name: Release ISO
+
+# Builds the Seedhodler OS live ISO on a version tag, then checksums, attests and
+# signs it, and publishes a GitHub Release. The image embeds the signed offline
+# Seedhodler app by hash (see flake.nix), so the whole thing is auditable from
+# source: `nix build .#iso` reproduces the image, and `nix build .#seedhodler-html`
+# checks the embedded app against the app release.
+#
+# workflow_dispatch builds and uploads the ISO as a workflow artifact for
+# inspection; only a tag push creates a Release.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write # create the release and upload assets
+  id-token: write # provenance attestation signing
+  attestations: write # write the provenance attestation
+
+jobs:
+  release:
+    name: Build, sign and publish the ISO
+    runs-on: ubuntu-latest
+    # Job-level so the sign step's `if` can read MINISIGN_KEY. Empty (no secret)
+    # until the key is configured on this repo, which cleanly disables signing.
+    env:
+      MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
+      MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The store closure, the uncompressed squashfs and the finished ISO together
+      # need more than the runner's default free space, so reclaim the preinstalled
+      # toolchains we do not use.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/.ghcup
+          sudo docker image prune -af || true
+          df -h /
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Build the ISO
+        run: nix build .#iso --print-build-logs
+
+      # The embedded app must be the published, signed offline release. Rebuild
+      # just that file and record its hash; it must match the app release.
+      - name: Show embedded app hash
+        run: |
+          nix build .#seedhodler-html --out-link app.html
+          sha256sum app.html
+
+      - name: Name the asset and write checksums
+        id: asset
+        run: |
+          set -euo pipefail
+          iso=$(ls result/iso/*.iso)
+          # Name the asset by this repo's release tag, not the app version baked
+          # into the build's own filename.
+          name="seedhodler-os-${GITHUB_REF_NAME}.iso"
+          install -m644 "$iso" "$name"
+          sha256sum "$name" > SHA256SUMS.txt
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          cat SHA256SUMS.txt
+          ls -la "$name"
+
+      # First-party GitHub action. Binds the file to this repo, commit and
+      # workflow run; verifiable later with:
+      #   gh attestation verify <file> --repo ${{ github.repository }}
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.asset.outputs.name }}
+
+      # Independent signature with the project's minisign key, so trust does not
+      # rest solely on GitHub. Runs only once MINISIGN_KEY is configured on this
+      # repo. The public key lives here as minisign.pub for verification.
+      - name: Sign with minisign
+        id: minisign
+        if: ${{ env.MINISIGN_KEY != '' }}
+        env:
+          ASSET: ${{ steps.asset.outputs.name }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq minisign
+          umask 077
+          printf '%s\n' "$MINISIGN_KEY" > minisign.key
+          for f in "$ASSET" SHA256SUMS.txt; do
+            printf '%s' "${MINISIGN_PASSWORD:-}" | minisign -S -s minisign.key -m "$f" -t "seedhodler-os ${GITHUB_REF_NAME}"
+          done
+          rm -f minisign.key
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          ls -la ./*.minisig
+
+      # Always available for inspection, including on workflow_dispatch runs.
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: seedhodler-os-iso
+          path: |
+            ${{ steps.asset.outputs.name }}
+            SHA256SUMS.txt
+            *.minisig
+          if-no-files-found: error
+
+      - name: Create or update the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          asset="${{ steps.asset.outputs.name }}"
+
+          files=( "$asset" SHA256SUMS.txt )
+          for s in "$asset.minisig" SHA256SUMS.txt.minisig; do
+            [ -f "$s" ] && files+=( "$s" )
+          done
+
+          notes="Seedhodler OS: an offline, amnesiac live ISO that boots straight into Seedhodler."
+          notes+=$'\n\n'"**Write to a USB stick and boot with no network:**"
+          notes+=$'\n'"\`sudo dd if=$asset of=/dev/sdX bs=4M status=progress oflag=sync\` (replace /dev/sdX; this erases the stick)."
+          notes+=$'\n\n'"**Verify before you trust it:**"
+          notes+=$'\n'"- Checksum: \`sha256sum -c SHA256SUMS.txt\`"
+          notes+=$'\n'"- Provenance: \`gh attestation verify $asset --repo ${{ github.repository }}\`"
+          notes+=$'\n'"- Reproduce from source: check out this tag and run \`nix build .#iso\`."
+          if [ "${{ steps.minisign.outputs.signed }}" = "true" ]; then
+            notes+=$'\n'"- Signature: \`minisign -Vm $asset -p minisign.pub\` (public key in the repo)"
+          fi
+          notes+=$'\n\n'"The embedded Seedhodler app is the signed **offline** release; check it with \`nix build .#seedhodler-html && sha256sum result\` against the app release's SHA256SUMS."
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" --title "$tag" --notes "$notes" "${files[@]}"
+          fi

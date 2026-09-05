@@ -163,7 +163,7 @@ in
   isoImage.makeUsbBootable = true;
   # Light, low-memory squashfs compression so the image assembles comfortably on
   # a small builder; the image is a bit larger but builds fast and does not OOM.
-  isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 3";
+  isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 19";
   # No copytoram in the default boot: copying the whole image into RAM (2 GB+) is
   # exactly what fails on low-RAM/old machines. The default boots on weak hardware
   # with the stick left in; the "(copytoram)" boot-menu entry still runs fully
@@ -226,8 +226,6 @@ in
       user = "hodler";
     };
   };
-  # Cursor theme, found by sway via the system icon path.
-  environment.systemPackages = [ pkgs.adwaita-icon-theme ];
 
   # No printing. Offline printing to arbitrary USB printers is a driver lottery
   # (host-based "winprinters" need proprietary firmware uploads, there is no
@@ -249,10 +247,39 @@ in
   ];
 
   # -------------------------------------------------------------------------
-  # Trim the closure.
+  # Trim the closure. The image is built on the installer profiles, which carry
+  # a lot we do not need for a single-purpose offline kiosk.
   # -------------------------------------------------------------------------
   documentation.enable = false;
   documentation.nixos.enable = false;
-  # No X11; cage runs on Wayland directly.
+  # No X11; sway runs on Wayland directly.
   services.xserver.enable = false;
+
+  # A graphical session pulls in speech-dispatcher for accessibility by default,
+  # which drags in ~380 MB of TTS voices (mbrola/flite/freepats). Not needed.
+  services.speechd.enable = lib.mkForce false;
+
+  # No audio at all: this is a seed tool. Drops the pipewire/pulse stack.
+  services.pipewire.enable = lib.mkForce false;
+  hardware.pulseaudio.enable = lib.mkForce false;
+
+  # The amnesiac live system never mounts the user's disks, so we only need vfat
+  # (the EFI system partition). Drops cifs (samba ~80 MB), btrfs, ntfs, xfs, f2fs
+  # and zfs tooling that the installer profile would otherwise include.
+  boot.supportedFilesystems = lib.mkForce [ "vfat" ];
+
+  # We never install or build from this live system, so drop the installer's
+  # offline machinery: the bundled Nixpkgs channel (~190 MB) and the stdenv
+  # toolchain (~300 MB of gcc/binutils/make) kept only for offline builds.
+  system.installer.channel.enable = false;
+  system.extraDependencies = lib.mkForce [ ];
+  # The flake pins its Nixpkgs into /etc/nix/registry.json, which keeps a ~190 MB
+  # copy of the Nixpkgs source in the image. A kiosk never runs nix, so drop it.
+  nix.registry = lib.mkForce { };
+
+  # Cursor theme, found by sway via the system icon path. (We do not mkForce the
+  # whole systemPackages list to strip the installer's repair tools: that also
+  # removes packages other modules add for the graphical session, e.g. dbus,
+  # which greetd/sway need to start at all.)
+  environment.systemPackages = [ pkgs.adwaita-icon-theme ];
 }
